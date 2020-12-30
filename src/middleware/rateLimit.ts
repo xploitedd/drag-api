@@ -36,9 +36,10 @@ async function limitBy(mongo: MongoHandler, limiter: AuthEntry | string): Promis
             if (isLimited)
                 return Promise.reject(isLimited)
 
+            const requests = 1 + limit.requests % limit.maxRequestsPerSecond
             await col.updateOne({ key: limit.key }, {
                 $set: {
-                    requests: 1,
+                    requests,
                     firstRequestTime: curTime,
                     maxRequestsPerSecond: keyObject.maxRequestsPerSecond
                 }

@@ -10,6 +10,7 @@ const mongo = new MongoHandler({
 })
 
 const app = express()
+app.set('trust proxy', process.env.SHOULD_TRUST_PROXY || true)
 
 app.use('/v1', router(mongo))
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
@@ -26,7 +27,7 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     res.json(apiErr)
 })
 
-app.listen(serverPort, async () => {
+app.listen(serverPort, () => {
     console.log(`Listening on port ${serverPort}`)
 })
 

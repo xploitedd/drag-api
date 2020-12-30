@@ -1,55 +1,87 @@
 import { Request, Response, NextFunction } from "express"
+import { ApiError } from "../app"
 import MongoHandler from "../handlers/mongoHandler"
-import { isAuthRequest } from "./auth"
+import { AuthEntry, isAuthEntry, isAuthRequest } from "./auth"
 
-const MAX_REQUESTS_PER_SECOND = 4
+const MAX_REQUESTS_PER_SECOND_IP = 2
+const MAX_REQUESTS_PER_SECOND_KEY = 4
 
-export default function rateLimit(mongoHandler: MongoHandler): (req: Request, res: Response, next: NextFunction) => void {
+interface IRateLimit {
+    key: string
+    isIp: boolean
+    requests: number
+    firstRequestTime: number
+    maxRequestsPerSecond: number
+}
+
+export default function rateLimit(mongo: MongoHandler) {
     return (req: Request, _: Response, next: NextFunction) => {
-        if (isAuthRequest(req)) {
-            limitByKey(mongoHandler, req.key!)
-                .then(() => next())
-                .catch(next)
-        }
+        const limiter = isAuthRequest(req) ? req.authEntry! : req.ip
+        limitBy(mongo, limiter)
+            .then(() => next())
+            .catch(next)
     }
 }
 
-async function limitByKey(mongoHandler: MongoHandler, key: string) {
-    return mongoHandler.execute(async db => {
+async function limitBy(mongo: MongoHandler, limiter: AuthEntry | string): Promise<void> {
+    return mongo.execute(async db => {
         const col = db.collection('rate_limit')
-        const res = await col.findOne({ key })
         const curTime = Date.now()
+        const keyObject = getKeyObject(limiter, curTime)
+        const res = await col.findOne({ key: keyObject.key })
 
         if (res) {
-            const limit = res as RateLimitKey
-            if (limit.requests === MAX_REQUESTS_PER_SECOND) {
-                if (curTime - limit.first_request_time < 1000) {
-                    return Promise.reject({
-                        status: 429,
-                        message: 'Rate limited'
-                    })
-                }
-            }
+            const limit = res as IRateLimit
+            const isLimited = checkRateLimit(limit, curTime)
+            if (isLimited)
+                return Promise.reject(isLimited)
 
-            await col.updateOne({ key }, { $set: {
-                requests: 1, 
-                first_request_time: curTime
-            }})
-        } else {
-            await col.insertOne({ 
-                key,
-                requests: 1,
-                first_request_time: curTime
+            await col.updateOne({ key: limit.key }, {
+                $set: {
+                    requests: 1,
+                    firstRequestTime: curTime,
+                    maxRequestsPerSecond: keyObject.maxRequestsPerSecond
+                }
             })
+        } else {
+            await col.insertOne(keyObject)
         }
-    }).catch(err => Promise.reject({
-        status: 500,
-        message: err.message
-    }))
+    })
 }
 
-interface RateLimitKey {
-    key: string
-    requests: number
-    first_request_time: number
+function getKeyObject(limiter: AuthEntry | string, time: number): IRateLimit {
+    let keyObj: IRateLimit
+    if (isAuthEntry(limiter)) {
+        keyObj = {
+            key: limiter.key,
+            isIp: false,
+            requests: 1,
+            firstRequestTime: time,
+            maxRequestsPerSecond: limiter.requestsPerSecond || MAX_REQUESTS_PER_SECOND_KEY
+        }
+    } else {
+        keyObj = {
+            key: limiter,
+            isIp: true,
+            requests: 1,
+            firstRequestTime: time,
+            maxRequestsPerSecond: MAX_REQUESTS_PER_SECOND_IP
+        }
+    }
+
+    return keyObj
+}
+
+function checkRateLimit(limit: IRateLimit, curTime: number): ApiError | null {
+    const maxPerSecond = limit.maxRequestsPerSecond
+    if (maxPerSecond >= 0 && limit.requests == maxPerSecond) {
+        if (curTime - limit.firstRequestTime < 1000) {
+            return {
+                status: 429,
+                message: 'Rate limited'
+            }
+        }
+    }
+
+    return null
 }

@@ -31,7 +31,6 @@ export default function auth(mongoHandler: MongoHandler): (req: AuthRequest, res
 
         const key = auth.substring(7)
         req.key = key
-
         verifyKey(mongoHandler, key).then(valid => {
             if (valid) {
                 req.validAuth = true

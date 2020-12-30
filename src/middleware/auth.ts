@@ -15,7 +15,7 @@ export default function auth(mongoHandler: MongoHandler): (req: AuthRequest, res
         req.validAuth = false
         const keyQuery = req.query.key
 
-        if (req.method == 'get' && keyQuery) {
+        if (req.method == 'GET' && keyQuery) {
             req.key = keyQuery as string
         } else {
             const auth = req.headers.authorization

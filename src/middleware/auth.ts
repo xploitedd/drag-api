@@ -1,4 +1,4 @@
-import { NextFunction, Request, Response } from "express";
+import e, { NextFunction, Request, Response } from "express";
 import MongoHandler from "../handlers/mongoHandler";
 
 export interface AuthRequest extends Request {
@@ -12,26 +12,31 @@ export function isAuthRequest(res: Request): res is AuthRequest {
 
 export default function auth(mongoHandler: MongoHandler): (req: AuthRequest, res: Response, next: NextFunction) => void {
     return (req: AuthRequest, _: Response, next: NextFunction) => {
-        const auth = req.headers.authorization
         req.validAuth = false
+        const keyQuery = req.query.key
 
-        if (!auth) {
-            return next({
-                status: 401,
-                message: 'Authorization key not provided!'
-            })
+        if (req.method == 'get' && keyQuery) {
+            req.key = keyQuery as string
+        } else {
+            const auth = req.headers.authorization
+            if (!auth) {
+                return next({
+                    status: 401,
+                    message: 'Authorization key not provided!'
+                })
+            }
+
+            if (!auth.startsWith('Bearer')) {
+                return next({
+                    status: 400,
+                    message: 'Authorization header isn\'t a Bearer!'
+                })
+            }
+
+            req.key = auth.substring(7)
         }
 
-        if (!auth.startsWith('Bearer')) {
-            return next({
-                status: 400,
-                message: 'Authorization header isn\'t a Bearer!'
-            })
-        }
-
-        const key = auth.substring(7)
-        req.key = key
-        verifyKey(mongoHandler, key).then(valid => {
+        verifyKey(mongoHandler, req.key!).then(valid => {
             if (valid) {
                 req.validAuth = true
                 return next()

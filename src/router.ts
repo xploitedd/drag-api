@@ -28,7 +28,7 @@ export default (mongo: MongoHandler): Router => {
         if (!id) {
             return next({
                 status: 400,
-                message: 'An invalid id was supplied!'
+                message: 'The word id must be a number!'
             })
         }
 

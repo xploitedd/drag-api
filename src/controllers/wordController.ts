@@ -17,8 +17,8 @@ export default class WordController {
         const words = await this.readWordsFile(lang)
         if (id < 0 || id >= words.length) {
             return Promise.reject({
-                status: 400,
-                message: 'Invalid word id!'
+                status: 404,
+                message: 'Word not found!'
             })
         }
 

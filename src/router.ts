@@ -16,10 +16,25 @@ export default (mongo: MongoHandler): Router => {
     })
 
     const wordController = new WordController()
-    router.get('/randomWord', auth(mongo, false), rateLimitMd, (req, res, next) => {
-        const lang = req.query.lang as string || 'en'
+    router.get('/word', auth(mongo, false), rateLimitMd, (req, res, next) => {
+        const lang = req.query.lang as string
         wordController.getRandomWord(lang)
-            .then(word => res.json({ word }))
+            .then(r => res.json(r))
+            .catch(next)
+    })
+
+    router.get('/word/:id', auth(mongo, false), rateLimitMd, (req, res, next) => {
+        const id = parseInt(req.params.id)
+        if (!id) {
+            return next({
+                status: 400,
+                message: 'An invalid id was supplied!'
+            })
+        }
+
+        const lang = req.query.lang as string
+        wordController.getWord(id, lang)
+            .then(r => res.json(r))
             .catch(next)
     })
 

@@ -3,8 +3,8 @@ import { ApiError } from "../app"
 import MongoHandler from "../handlers/mongoHandler"
 import { AuthEntry, isAuthEntry, isAuthRequest } from "./auth"
 
-const MAX_REQUESTS_PER_SECOND_IP = 2
-const MAX_REQUESTS_PER_SECOND_KEY = 4
+const MAX_REQUESTS_PER_SECOND_IP = 6
+const MAX_REQUESTS_PER_SECOND_KEY = 12
 
 interface IRateLimit {
     key: string
